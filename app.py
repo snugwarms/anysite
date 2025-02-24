@@ -96,14 +96,38 @@ def generate_content(path):
             headers=headers,
             json=data
         )
-        response.raise_for_status()
-        content = response.json()['choices'][0]['message']['content']
         
-        # Filter out code block markers and other unwanted strings
-        content = content.replace('```html', '').replace('```', '').replace('`);', '')
-        content = content.strip()
+        # Check for rate limiting
+        if response.status_code == 429:
+            error_msg = "<h1>Error</h1><p>Rate limited by OpenRouter API. Please try again in a few moments.</p>"
+            return prompt, error_msg
+            
+        response.raise_for_status()
+        response_json = response.json()
+        
+        # Debug logging
+        print("API Response:", response_json)
+        
+        if 'choices' not in response_json or not response_json['choices']:
+            error_msg = f"<h1>Error</h1><p>Invalid API response structure: {response_json}</p>"
+            return prompt, error_msg
+            
+        content = response_json['choices'][0]['message']['content']
+        
+        # Filter out code block markers and unwanted patterns
+        content = content.replace('```html', '').replace('```', '')
+        
+        # Remove any lines containing backtick patterns
+        cleaned_lines = []
+        for line in content.split('\n'):
+            if '`);' not in line and '`' not in line:
+                cleaned_lines.append(line)
+        content = '\n'.join(cleaned_lines).strip()
         
         return prompt, content
+    except requests.exceptions.RequestException as e:
+        error_msg = f"<h1>Error</h1><p>API request failed: {str(e)}</p>"
+        return prompt, error_msg
     except Exception as e:
         error_msg = f"<h1>Error</h1><p>Failed to generate content: {str(e)}</p>"
         return prompt, error_msg
