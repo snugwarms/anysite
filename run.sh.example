@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#kills the currently running version, for your iteration pleasure.
+docker ps | grep 9999 | awk '{print $1}' | xargs docker stop && docker build -t dynamic-web .
+
+
 docker run -d \
   -p 9999:5000 \
   -e OPENROUTER_API_KEY=yourkeyhere \
