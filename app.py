@@ -62,6 +62,12 @@ BASE_TEMPLATE = """
             padding: 20px;
         }
     </style>
+    <script>
+        console.log('=== PROMPT ===');
+        console.log(`{{ debug_prompt | safe }}`);
+        console.log('=== LLM RESPONSE ===');
+        console.log(`{{ debug_response | safe }}`);
+    </script>
 </head>
 <body>
     {{ content | safe }}
@@ -92,9 +98,15 @@ def generate_content(path):
         )
         response.raise_for_status()
         content = response.json()['choices'][0]['message']['content']
-        return content
+        
+        # Filter out code block markers and other unwanted strings
+        content = content.replace('```html', '').replace('```', '').replace('`);', '')
+        content = content.strip()
+        
+        return prompt, content
     except Exception as e:
-        return f"<h1>Error</h1><p>Failed to generate content: {str(e)}</p>"
+        error_msg = f"<h1>Error</h1><p>Failed to generate content: {str(e)}</p>"
+        return prompt, error_msg
 
 @app.route('/', defaults={'path': 'home'})
 @app.route('/<path:path>')
@@ -106,16 +118,32 @@ def dynamic_page(path):
     # Check cache first
     cached_content = get_cached_content(path)
     if cached_content:
-        return render_template_string(BASE_TEMPLATE, title=title, content=cached_content)
+        return render_template_string(
+            BASE_TEMPLATE,
+            title=title,
+            content=cached_content,
+            debug_prompt="(Cached) Original prompt not available",
+            debug_response="(Cached) Original response not available"
+        )
     
     # Generate new content if not cached
-    content = generate_content(path)
+    prompt, content = generate_content(path)
     
     # Cache the new content
     cache_content(path, content)
     
-    # Render with base template
-    return render_template_string(BASE_TEMPLATE, title=title, content=content)
+    # Escape backticks and backslashes for JavaScript template literal
+    safe_prompt = prompt.replace('\\', '\\\\').replace('`', '\\`')
+    safe_content = content.replace('\\', '\\\\').replace('`', '\\`')
+    
+    # Render with base template and debug info
+    return render_template_string(
+        BASE_TEMPLATE,
+        title=title,
+        content=content,
+        debug_prompt=safe_prompt,
+        debug_response=safe_content
+    )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
