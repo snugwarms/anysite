@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+COPY app.py prompt.txt ./
 
 # Create cache directory with proper permissions
 RUN mkdir -p /app/cache && \
@@ -14,7 +14,6 @@ RUN mkdir -p /app/cache && \
 ENV FLASK_APP=app.py
 ENV OPENROUTER_API_KEY=none
 ENV OPENROUTER_MODEL=google/gemini-2.0-flash-001
-ENV PROMPT_TEMPLATE="Generate a webpage about \"{path}\". \nThe content should be informative and engaging.\nReturn only the HTML content for the body (no <html>, <head>, or <body> tags).\nUse semantic HTML elements and include proper headings."
 
 EXPOSE 5000
 

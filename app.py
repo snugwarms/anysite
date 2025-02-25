@@ -39,13 +39,14 @@ def cache_content(path, content):
     with open(cache_path, 'w') as f:
         json.dump(cache_data, f)
 
+# Load prompt from file
+PROMPT_FILE = os.path.join(os.path.dirname(__file__), 'prompt.txt')
+with open(PROMPT_FILE, 'r') as f:
+    DEFAULT_PROMPT = f.read().strip()
+
 # Environment variables with defaults
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', 'none')
 OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'google/gemini-2.0-flash-001')
-DEFAULT_PROMPT = os.getenv('PROMPT_TEMPLATE', '''Generate a webpage about "{path}". 
-The content should be informative and engaging.
-Return only the HTML content for the body (no <html>, <head>, or <body> tags).
-Use semantic HTML elements and include proper headings.''')
 
 # Base HTML template
 BASE_TEMPLATE = """
