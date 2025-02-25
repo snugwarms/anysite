@@ -51,29 +51,7 @@ OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'google/gemini-2.0-flash-001')
 # Base HTML template
 BASE_TEMPLATE = """
 <!DOCTYPE html>
-<html>
-<head>
-    <title>{{ title }}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-    </style>
-    <script>
-        console.log('=== PROMPT ===');
-        console.log(`{{ debug_prompt | safe }}`);
-        console.log('=== LLM RESPONSE ===');
-        console.log(`{{ debug_response | safe }}`);
-    </script>
-</head>
-<body>
     {{ content | safe }}
-</body>
-</html>
 """
 
 def generate_content(path):
