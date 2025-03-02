@@ -1,25 +1,27 @@
-FROM registry.access.redhat.com/ubi8/python-39:latest
+FROM python:3.9-slim
 
 # Set working directory
 WORKDIR /app
 
-# Switch to root to create cache directory
-USER 0
+# Copy application files first
+COPY requirements.txt .
+COPY app.py prompt.txt index.html robots.txt ./
 
-# Create cache directory with proper permissions
-RUN mkdir -p /cache && \
-    chgrp -R 0 /cache && \
-    chmod -R g=u /cache
-
-# Switch back to default non-root user
-USER 1001
+# Create non-root user and set up permissions
+RUN groupadd -r appuser && useradd -r -g appuser -s /sbin/nologin appuser && \
+    mkdir -p /cache && \
+    touch /cache/requests && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /cache && \
+    chmod 777 /cache && \
+    chmod 666 /cache/requests && \
+    ls -la /cache
 
 # Install dependencies
-COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy application files
-COPY app.py prompt.txt index.html robots.txt ./
+# Switch to non-root user
+USER appuser
 
 # Set environment variables
 ENV FLASK_APP=app.py \

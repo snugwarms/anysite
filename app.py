@@ -37,15 +37,28 @@ def is_meta_ip(ip):
         return False
 
 @app.before_request
-def block_crawlers():
-    """Block known crawlers and Meta IPs"""
-    # Check User-Agent
-    user_agent = request.headers.get('User-Agent', '').lower()
-    if any(bot.lower() in user_agent for bot in BLOCKED_USER_AGENTS):
+def log_and_block():
+    """Log request and block unwanted visitors"""
+    # Get request details
+    timestamp = datetime.now().isoformat()
+    ip = request.remote_addr
+    path = request.path
+    user_agent = request.headers.get('User-Agent', '')
+    
+    # Log to file
+    log_file = os.path.join(CACHE_DIR, 'requests')
+    try:
+        with open(log_file, 'a') as f:
+            f.write(f"{timestamp} | {ip} | {path} | {user_agent}\n")
+    except IOError as e:
+        app.logger.error(f"Failed to write to request log: {str(e)}")
+
+    # Block crawlers
+    if any(bot.lower() in user_agent.lower() for bot in BLOCKED_USER_AGENTS):
         abort(403, "Crawlers not allowed")
     
-    # Check IP
-    if is_meta_ip(request.remote_addr):
+    # Block Meta IPs
+    if is_meta_ip(ip):
         abort(403, "Access denied")
 
 # Security headers
@@ -69,18 +82,31 @@ def get_cache_path(path):
     # Sanitize path to prevent directory traversal
     safe_path = re.sub(r'[^a-zA-Z0-9-_.]', '', path)
     hash_object = hashlib.md5(safe_path.encode())
-    return os.path.join(CACHE_DIR, f"{hash_object.hexdigest()}.json")
+    cache_path = os.path.join(CACHE_DIR, f"{hash_object.hexdigest()}.json")
+    app.logger.info(f"Cache path for {path}: {cache_path}")
+    return cache_path
 
 def get_cached_content(path):
     """Retrieve cached content if it exists"""
     cache_path = get_cache_path(path)
     if os.path.exists(cache_path):
         try:
+            app.logger.info(f"Found cache file: {cache_path}")
             with open(cache_path, 'r') as f:
                 cached_data = json.load(f)
                 return cached_data['content']
-        except (json.JSONDecodeError, KeyError, ValueError, IOError):
-            pass
+        except (json.JSONDecodeError, KeyError, ValueError, IOError) as e:
+            app.logger.error(f"Error reading cache file {cache_path}: {str(e)}")
+            if os.access(cache_path, os.W_OK):
+                app.logger.info(f"Cache file is writable")
+            else:
+                app.logger.error(f"Cache file is not writable")
+    else:
+        app.logger.info(f"No cache file found at: {cache_path}")
+        if os.access(CACHE_DIR, os.W_OK):
+            app.logger.info(f"Cache directory is writable")
+        else:
+            app.logger.error(f"Cache directory is not writable")
     return None
 
 def cache_content(path, content):
@@ -91,10 +117,15 @@ def cache_content(path, content):
             'content': content,
             'timestamp': datetime.now().isoformat()
         }
+        app.logger.info(f"Attempting to write cache file: {cache_path}")
         with open(cache_path, 'w') as f:
             json.dump(cache_data, f)
-    except IOError:
-        app.logger.error(f"Failed to write to cache file: {cache_path}")
+        app.logger.info(f"Successfully wrote cache file: {cache_path}")
+    except IOError as e:
+        app.logger.error(f"Failed to write to cache file {cache_path}: {str(e)}")
+        # Check permissions
+        app.logger.error(f"Cache directory permissions: {oct(os.stat(CACHE_DIR).st_mode)}")
+        app.logger.error(f"Cache directory owner: {os.stat(CACHE_DIR).st_uid}")
 
 # Load prompt from file
 PROMPT_FILE = os.path.join(os.path.dirname(__file__), 'prompt.txt')
